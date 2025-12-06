@@ -1,10 +1,10 @@
-import { Authenticated, Unauthenticated, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { SignInForm } from "./SignInForm";
 import { SignOutButton } from "./SignOutButton";
 import { Toaster } from "sonner";
 import { TripPlanner } from "./components/TripPlanner";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TripView } from "./components/TripView";
 import { SavedTrips } from "./components/SavedTrips";
 import { Id } from "../convex/_generated/dataModel";
@@ -14,6 +14,21 @@ type View = "planner" | "trip" | "saved";
 export default function App() {
   const [currentView, setCurrentView] = useState<View>("planner");
   const [currentTripId, setCurrentTripId] = useState<Id<"trips"> | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState<any>(null);
+
+  // Check if user is logged in (from localStorage)
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+        setIsAuthenticated(true);
+      } catch (e) {
+        console.error("Failed to parse stored user", e);
+      }
+    }
+  }, []);
 
   const handleTripGenerated = (tripId: Id<"trips">) => {
     setCurrentTripId(tripId);
@@ -25,14 +40,24 @@ export default function App() {
     setCurrentView("trip");
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    setUser(null);
+    setIsAuthenticated(false);
+    setCurrentView("planner");
+  };
+
   return (
     <>
-      <Unauthenticated>
+      {!isAuthenticated ? (
         <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-indigo-100">
-          <AuthPage />
+          <AuthPage onAuthSuccess={(userData) => {
+            setUser(userData);
+            setIsAuthenticated(true);
+            localStorage.setItem("user", JSON.stringify(userData));
+          }} />
         </div>
-      </Unauthenticated>
-      <Authenticated>
+      ) : (
         <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-indigo-100">
           <header className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm h-16 flex justify-between items-center border-b shadow-sm px-4">
             <div className="flex items-center gap-4">
@@ -60,7 +85,15 @@ export default function App() {
                 </button>
               </nav>
             </div>
-            <SignOutButton />
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-700">Welcome, {user?.username}!</span>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+              >
+                Sign Out
+              </button>
+            </div>
           </header>
           
           <main className="flex-1 p-4">
@@ -74,12 +107,12 @@ export default function App() {
           </main>
           <Toaster />
         </div>
-      </Authenticated>
+      )}
     </>
   );
 }
 
-function AuthPage() {
+function AuthPage({ onAuthSuccess }: { onAuthSuccess: (user: any) => void }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -93,7 +126,7 @@ function AuthPage() {
           <p className="text-center text-gray-700 mb-6 font-medium">
             Sign in or create an account to get started
           </p>
-          <SignInForm />
+          <SignInForm onAuthSuccess={onAuthSuccess} />
         </div>
 
         <p className="text-center text-gray-600 text-sm mt-6">

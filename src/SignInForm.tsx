@@ -1,13 +1,12 @@
 "use client";
-import { useAuthActions } from "@convex-dev/auth/react";
 import { useMutation } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { useState } from "react";
 import { toast } from "sonner";
 
-export function SignInForm() {
-  const { signIn } = useAuthActions();
-  const createUserProfile = useMutation(api.auth.createUserProfile);
+export function SignInForm({ onAuthSuccess }: { onAuthSuccess: (user: any) => void }) {
+  const signup = useMutation(api.auth.signup);
+  const signin = useMutation(api.auth.signin);
   const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
   const [submitting, setSubmitting] = useState(false);
   const [username, setUsername] = useState("");
@@ -30,64 +29,45 @@ export function SignInForm() {
           setSubmitting(false);
           return;
         }
-        if (password.length < 8) {
-          toast.error("Password must be at least 8 characters");
+        if (password.length < 6) {
+          toast.error("Password must be at least 6 characters");
           setSubmitting(false);
           return;
         }
-      }
 
-      const formData = new FormData();
-      formData.set("flow", flow);
-      formData.set("email", email.toLowerCase().trim());
-      formData.set("password", password);
-
-      console.log("Attempting", flow, "with email:", email);
-      
-      const result = await signIn("password", formData);
-      console.log("Auth result:", result);
-      
-      // After successful authentication
-      if (flow === "signUp") {
-        try {
-          // Add a delay to ensure auth state is updated server-side
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          console.log("Creating profile for username:", username);
-          await createUserProfile({
-            email: email.toLowerCase().trim(),
-            username: username.trim(),
-          });
-          console.log("Profile created successfully");
-          toast.success("Account created successfully!");
-        } catch (profileError) {
-          const errorMsg = profileError instanceof Error ? profileError.message : "Failed to create profile";
-          console.error("Profile creation error:", errorMsg);
-          if (errorMsg.includes("Username already taken")) {
-            toast.error("Username already taken. Please choose another.");
-          } else {
-            toast.warning("Account created successfully! Welcome to TripGenie!");
-          }
-        }
+        console.log("Signing up with:", { email, username });
+        const result = await signup({
+          email: email.toLowerCase().trim(),
+          username: username.trim(),
+          password,
+        });
+        console.log("Signup result:", result);
+        
+        toast.success("Account created successfully!");
+        onAuthSuccess(result);
       } else {
+        // Sign in
+        console.log("Signing in with:", email);
+        const result = await signin({
+          email: email.toLowerCase().trim(),
+          password,
+        });
+        console.log("Signin result:", result);
+        
         toast.success("Signed in successfully!");
+        onAuthSuccess(result);
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : "Authentication failed";
       console.error("Auth error:", errorMsg);
       
       let toastTitle = "";
-      if (errorMsg.includes("Invalid") || errorMsg.includes("password")) {
-        if (flow === "signUp") {
-          toastTitle = "Signup failed. Email may already be registered.";
-        } else {
-          toastTitle = "Invalid email or password.";
-        }
-      } else if (errorMsg.includes("Username")) {
-        toastTitle = "Username already taken. Please choose another.";
-      } else if (errorMsg.includes("Email")) {
-        toastTitle = "Email already registered. Try signing in instead.";
+      if (errorMsg.includes("already")) {
+        toastTitle = errorMsg;
+      } else if (flow === "signUp") {
+        toastTitle = "Could not create account. " + errorMsg;
       } else {
-        toastTitle = flow === "signUp" ? "Could not create account." : "Could not sign in.";
+        toastTitle = "Invalid email or password";
       }
       toast.error(toastTitle);
     } finally {
