@@ -100,8 +100,28 @@ Important:
       // Save the trip to the database
       const userId = await getAuthUserId(ctx);
       const tripId: any = await ctx.runMutation(api.trips.saveTrip, {
-        ...tripData,
+        destination: tripData.destination,
+        days: tripData.days,
+        currency: tripData.currency,
         totalEstimatedCost: tripData.total_estimated_cost,
+        dailyPlan: tripData.daily_plan.map((day: any) => ({
+          day: day.day,
+          title: day.title,
+          estimatedCost: day.estimated_cost,
+          activities: day.activities.map((activity: any) => ({
+            timeOfDay: activity.time_of_day,
+            name: activity.name,
+            description: activity.description,
+            category: activity.category,
+            estimatedCost: activity.estimated_cost,
+            location: activity.location ? {
+              placeName: activity.location.place_name,
+              lat: activity.location.lat,
+              lng: activity.location.lng,
+            } : undefined,
+          })),
+        })),
+        packingTips: tripData.packing_tips || [],
         userId: userId || undefined,
         createdAt: Date.now(),
       });
