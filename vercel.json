@@ -1,0 +1,8 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "env": {
+    "VITE_CONVEX_URL": "https://kindly-chameleon-542.convex.cloud"
+  },
+  "regions": ["iad1"]
+}
